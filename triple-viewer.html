@@ -1,0 +1,34 @@
+<link rel="import" href="../polymer/polymer.html">
+
+<!--
+`triple-viewer`
+Complex element joining nextprot feature viewer, feature table and sequence viewer
+
+@demo demo/index.html 
+-->
+
+<dom-module id="triple-viewer">
+  <template>
+    <style>
+      :host {
+        display: block;
+      }
+    </style>
+    <h2>Hello [[prop1]]</h2>
+  </template>
+
+  <script>
+    Polymer({
+
+      is: 'triple-viewer',
+
+      properties: {
+        prop1: {
+          type: String,
+          value: 'triple-viewer',
+        },
+      },
+
+    });
+  </script>
+</dom-module>
