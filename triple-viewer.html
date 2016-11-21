@@ -1,34 +1,485 @@
 <link rel="import" href="../polymer/polymer.html">
-
+<script src="../nextprot/dist/nextprot.bundle.js"></script>
+<script src="../feature-viewer/dist/feature-viewer.bundle.js"></script>
+<link rel="stylesheet" type="text/css" href="../feature-viewer/dist/feature-viewer.min.css">
+<script src="../sequence-viewer/dist/sequence-viewer.bundle.js"></script>
 <!--
 `triple-viewer`
 Complex element joining nextprot feature viewer, feature table and sequence viewer
-
 @demo demo/index.html 
 -->
-
 <dom-module id="triple-viewer">
   <template>
     <style>
       :host {
         display: block;
       }
+      .loading_icon {
+        -webkit-animation:spin 2s linear infinite;
+        -moz-animation:spin 2s linear infinite;
+        animation:spin 2s linear infinite;
+        width:200px;
+        height:200px;
+      }
+      @-moz-keyframes spin { 100% {
+        -moz-transform:rotate(360deg);
+      } }
+      @-webkit-keyframes spin { 100% {
+        -webkit-transform:rotate(360deg);
+      } }
+      @keyframes spin { 100% {
+        -webkit-transform:rotate(360deg);
+        transform:rotate(360deg);
+      } }
     </style>
-    <h2>Hello [[prop1]]</h2>
+    <div id="featureViewer"></div>
+    <div class="row" style="margin:0px 20px;">
+      <div id="featuresTable" class="col-md-6" style="margin:10px 0px">
+        <div id="featTableScroller" class="section-scroller">
+          <table id="featTable" class="table table-striped table-fixed">
+            <thead>
+            <tr>
+              <th class="featName" class="col-md-2">Name</th>
+              <th class="col-md-2 text-align-right">Position</th>
+              <th class="col-md-1 text-align-right">Length</th>
+              <th class="col-md-5">Description</th>
+              <th colspan="2" class="col-md-2 text-align-left">Evidence</th>
+            </tr>
+            </thead>
+            <template is="dom-repeat" items="{{_toArray(groupedFeatures)}}" as="gf">
+              <tbody>
+              <th colspan="6" class="className {{gf.value.group}} general-info table-section-header"><div class="grey-x">{{gf.value.group}}</div></th>
+              {{#each features}}
+              {{#each this}}
+              <tr id={{id}} class="{{{className category}}} general-info" >
+                <td>{{category}}</td>
+                <td class="text-align-right"><a class="featPosition" href="javascript:;">{{{position length}}}</a></td>
+                <td class="text-align-right">{{length}}</td>
+                <td>{{{link}}}{{#if variant}}{{#each source}}{{#if externalDb}}{{#if crossRef}}{{#crossRef}} ; {{dbName}} : {{{linkTo name url}}} {{/crossRef}}{{/if}}{{/if}}{{/each}}{{/if}}{{#unless proteotypicity}} <span class="nonProteotypic">found in other entries</span>{{/unless}}
+                  {{> quality-label qualityQualifier=quality}}
+                </td>
+                {{#if source}}
+                <td class="text-align-right"><span class="evidenceNumber">{{evidenceLength}}</span></td>
+                <td>
+                  <div class="reference-label-container">
+                    {{#each evidenceSources}}
+                    <div class="reference-label">{{this}}</div>
+                    {{/each}}
+                  </div>
+                </td>
+                {{else}}
+                <td></td>
+                <td></td>
+                {{/if}}
+              </tr>
+              <tr class="{{{className category}}} detailed-info">
+                <td colspan="6" class="table-row-evidence">
+                  {{#each source}}
+                  {{> evidence codeName=evidenceCodeName source=assignedBy accession=crossRef.name url=crossRef.url}}
+                  <div class="{{#if publicationMD5}}evidence-publication{{/if}}">
+                    {{> publication parentId=(concat id ../id)}}
+                  </div>
+                  {{/each}}
+                </td>
+              </tr>
+              {{/each}}{{/each}}
+              </tbody>
+            </template>
+          </table>
+        </div>
+      </div>
+      <div class="col-md-6 right-block" style="margin:10px 0px;padding-right:0px;">
+        <div id="seqViewer"></div>
+      </div>
+    </div>
   </template>
-
   <script>
     Polymer({
-
       is: 'triple-viewer',
-
       properties: {
-        prop1: {
-          type: String,
-          value: 'triple-viewer',
+        isoform: {
+          type: String
         },
+        featuresByIsoform: {
+          type: Array,
+          value: []
+        },
+        featureList: {
+          type: Array,
+          value: [
+      {
+        "APIRef": "sequence",
+        "metadata": {"name": "Sequence"}
       },
+      {
+        "APIRef": "interacting-region",
+        "metadata": {
+          "name": "Interacting region",
+          "className": "intregion",
+          "color": "#B3C2F0",
+          "type": "rect",
+          "filter": "Region"
+        }
+      },
+      {
+        "APIRef": "miscellaneous-region",
+        "metadata": {
+          "name": "Region",
+          "className": "miscregion",
+          "color": "#B3C2B3",
+          "type": "rect",
+          "filter": "Region"
+        }
+      },
+      {
+        "APIRef": "domain",
+        "metadata": {
+          "name": "Domain",
+          "className": "domain",
+          "color": "#B3C2C2",
+          "type": "rect",
+          "filter": "Region"
+        }
+      },
+      {
+        "APIRef": "repeat",
+        "metadata": {
+          "name": "Repeat",
+          "className": "repeat",
+          "color": "#98B7D5",
+          "type": "rect",
+          "filter": "Region"
+        }
+      },
+      {
+        "APIRef": "calcium-binding-region",
+        "metadata": {
+          "name": "Calcium binding",
+          "className": "calcium",
+          "color": "#B3C2E1",
+          "type": "rect",
+          "filter": "Region"
+        }
+      },
+      {
+        "APIRef": "zinc-finger-region",
+        "metadata": {
+          "name": "Zinc finger",
+          "className": "calcium",
+          "color": "#B3C2E1",
+          "type": "rect",
+          "filter": "Region"
+        }
+      },
+      {
+        "APIRef": "dna-binding-region",
+        "metadata": {
+          "name": "DNA binding",
+          "className": "dnabind",
+          "color": "#B3C2FF",
+          "type": "rect",
+          "filter": "Region"
+        }
+      },
+      {
+        "APIRef": "nucleotide-phosphate-binding-region",
+        "metadata": {
+          "name": "Nucleotide binding",
+          "className": "nucleobind",
+          "color": "#B3D1B3",
+          "type": "rect",
+          "filter": "Region"
+        }
+      },
+      {
+        "APIRef": "coiled-coil-region",
+        "metadata": {
+          "name": "Coiled-coil",
+          "className": "coiledcoil",
+          "color": "#B3D1C2",
+          "type": "rect",
+          "filter": "Region"
+        }
+      },
+      {
+        "APIRef": "short-sequence-motif",
+        "metadata": {
+          "name": "Sequence motif",
+          "className": "motif",
+          "color": "#B3D1D1",
+          "type": "rect",
+          "filter": "Region"
+        }
+      },
+      {
+        "APIRef": "compositionally-biased-region",
+        "metadata": {
+          "name": "Composition bias",
+          "className": "biased",
+          "color": "#B3D1E1",
+          "type": "rect",
+          "filter": "Region"
+        }
+      },
+      {
+        "APIRef": "topological-domain",
+        "metadata": {
+          "name": "Top domain",
+          "className": "topodomain",
+          "color": "#A5DBA5",
+          "type": "rect",
+          "filter": "Topology"
+        }
+      },
+      {
+        "APIRef": "transmembrane-region",
+        "metadata": {
+          "name": "Membrane",
+          "className": "membrane",
+          "color": "#A5DBB7",
+          "type": "rect",
+          "filter": "Topology"
+        }
+      },
+      {
+        "APIRef": "miscellaneous-site",
+        "metadata": {
+          "name": "Site",
+          "className": "site",
+          "color": "#B3F0E1",
+          "type": "unique",
+          "filter": "Site"
+        }
+      },
+      {
+        "APIRef": "active-site",
+        "metadata": {
+          "name": "Active site",
+          "className": "actSite",
+          "color": "#B3F0F0",
+          "type": "unique",
+          "filter": "Site"
+        }
+      },
+      {
+        "APIRef": "binding-site",
+        "metadata": {
+          "name": "Binding site",
+          "className": "bindsite",
+          "color": "#82E6FF",
+          "type": "unique",
+          "filter": "Site"
+        }
+      },
+      {
+        "APIRef": "cleavage-site",
+        "metadata": {
+          "name": "Cleavage site",
+          "className": "cleavsite",
+          "color": "#B3FFB3",
+          "type": "unique",
+          "filter": "Site"
+        }
+      },
+      {
+        "APIRef": "metal-binding-site",
+        "metadata": {
+          "name": "Metal binding",
+          "className": "metal",
+          "color": "#B3FFC2",
+          "type": "unique",
+          "filter": "Site"
+        }
+      },
+      {
+        "APIRef": "variant",
+        "metadata": {
+          "name": "Variant",
+          "className": "variant",
+          "color": "rgba(0,255,154,0.3)",
+          "type": "unique",
+          "filter": "Variant"
+        }
+      },
+      {
+        "APIRef": "mutagenesis",
+        "metadata": {
+          "name": "Mutagenesis",
+          "className": "mutagenesis",
+          "color": "#73FFE3",
+          "type": "unique",
+          "filter": "Variant"
+        }
+      },
+      {
+        "APIRef": "sequence-conflict",
+        "metadata": {
+          "name": "Conflict",
+          "className": "seqconflict",
+          "color": "#6FFFFF",
+          "type": "unique",
+          "filter": "Conflict"
+        }
+      },
+      {
+        "APIRef": "beta-strand",
+        "metadata": {
+          "name": "Beta strand",
+          "className": "betastrand",
+          "color": "#B3F0C2",
+          "type": "rect",
+          "filter": "Secondary structure"
+        }
+      },
+      {
+        "APIRef": "helix",
+        "metadata": {
+          "name": "Helix",
+          "className": "helix",
+          "color": "#B3F0D1",
+          "type": "rect",
+          "filter": "Secondary structure"
+        }
+      },
+      {
+        "APIRef": "turn",
+        "metadata": {
+          "name": "Turn",
+          "className": "turn",
+          "color": "#B3F0E1",
+          "type": "rect",
+          "filter": "Secondary structure"
+        }
+      },
+      {
+        "APIRef": "isoform-mapping",
+        "metadata": {}
+      }
+    ]
+        },
+        featuresForViewer: {
+          type: Array,
+          value: []
+        }
+      },
+      attached: function() {
+        var nx = new Nextprot.Client("neXtprot triple viewer", "Calipho Group");
+        var nxEntry = nx.getEntryName();
+        this.isoName = nxEntry+"-1";
+        var self=this;
+        nx.getProteinSequence(nxEntry).then(
+          function (data) {
+            self.sequences = data;
+            console.log(data);
+            self.getMetadataByView();
+            self.getFeaturesByIsoform();
+            self.renderFeatureViewer();
+            self.fillTable();
+          }
+        );//.catch(function (err) {
+            // catch any error that happened so far
+        //    console.log("Argh, broken: " + err.message);
+        //    console.log("Error at line : " + err.stack);
+        //});
+      },
+      getFeaturesByIsoform: function(){
+        for (var i=1; i<this.sequences.length-1;i++) {
+          var feat = NXUtils.convertMappingsToIsoformMap(this.sequences[i],this.metaData[i].name,this.metaData[i].filter, "");
+          this.featuresByIsoform.push(feat);
+          featForViewer = NXViewerUtils.convertNXAnnotations(feat,this.metaData[i]);
+          this.featuresForViewer.push(featForViewer);
+        }
+        console.log(this.featuresByIsoform);
+      },
+      getMetadataByView: function() {
+        this.metaData = [];
+        for (var i = 0; i < this.featureList.length - 1; i++) {
+          this.metaData.push(this.featureList[i].metadata);
+        }
+      },
+      renderFeatureViewer: function(){
+        var self=this;
+        this.sequences.forEach(function (o) {
+          if (o.uniqueName === self.isoName) {
+            currentSeq = o.sequence;
+            ft = new FeatureViewer(currentSeq, "#featureViewer", {
+              showAxis: true,
+              showSequence: true,
+              brushActive: true,
+              toolbar:true,
+              bubbleHelp:true,
+              unit:"aa",
+              zoomMax:10,
+              toolbarTemplate: 2,
+              positionWithoutLetter:true,
+              tooltipColor:"black"
+            });
+            seqView = new Sequence(currentSeq, this.isoName);
+            seqView.render('#seqViewer', {
+              'showLineNumbers': true,
+              'wrapAminoAcids': true,
+              'charsPerLine': 50,
+              'search':true,
+              'toolbar':true,
+              'header':{
+                'display':false,
+                'searchInTitle': false,
+                'showCpl':false,
+                'badgeWithUnit':true
+              }
+            });
+          }
+        });
+      },
+      fillTable: function() {
+        if ($("#featuresTable").length > 0) {
+          var number = 0;
+          var features = {};
+          this.featuresByIsoform.forEach( function (d) { if (d.hasOwnProperty(this.isoName)) {
+            if(d[this.isoName]) {
+              var group = d[this.isoName][0].group;
+              if(Object.keys(features).indexOf(group)<0) {
+                features[group] = {'group': group, 'features': [d[this.isoName]]};
+              } else {
+                features[group]['features'].push(d[this.isoName]);
+              }
+            }
+          }});
 
+          for (feat in this.featuresByIsoform) if(this.featuresByIsoform[feat].hasOwnProperty(this.isoName)) {
+            number += this.featuresByIsoform[feat][this.isoName].length;
+            for (var i=0;i<this.featuresByIsoform[feat][this.isoName].length;i++) if(this.featuresByIsoform[feat][this.isoName][i].source) {
+              this.featuresByIsoform[feat][this.isoName][i].evidenceSources = _getUniqueListOfEvidenceSources(this.featuresByIsoform[feat][this.isoName][i].source);
+            }
+          }
+          this.groupedFeatures = features;
+          console.log(this.groupedFeatures);
+          this.featuresLength = number;
+        };
+        $(".evidenceNumber").click(function () {
+          $(this).parent().parent().next().toggle();
+        })
+      },
+      _getUniqueListOfEvidenceSources: function(evidenceList){
+        var evidenceSourceList = [];
+        evidenceList.forEach(function(evidence){
+          if(evidenceSourceList.indexOf(evidence.assignedBy) < 0) {
+            evidenceSourceList.push(evidence.assignedBy);
+          }
+        });
+        return evidenceSourceList.sort(NXUtils.sortByAlphabet);
+      },
+      _toArray: function(obj) {
+        if (typeof obj === 'object') {
+          return Object.keys(obj).map(function(key) {
+            return {
+              name: key,
+              value: obj[key]
+            };
+          });
+        }
+        return null;
+      }
     });
   </script>
 </dom-module>

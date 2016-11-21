@@ -3,12 +3,15 @@
   "description": "Complex element joining nextprot feature viewer, feature table and sequence viewer",
   "main": "triple-viewer.html",
   "dependencies": {
-    "polymer": "Polymer/polymer#^1.4.0"
+    "polymer": "Polymer/polymer#1.7",
+    "feature-viewer": "^x.x.x",
+    "nextprot-js": "nextprot#^0.0.x",
+    "sequence-viewer": "^x.x.x"
   },
   "devDependencies": {
     "iron-component-page": "PolymerElements/iron-component-page#^1.0.0",
     "iron-demo-helpers": "PolymerElements/iron-demo-helpers#^1.0.0",
     "web-component-tester": "^4.0.0",
-    "webcomponentsjs": "webcomponents/webcomponentsjs#^0.7.0"
+    "webcomponentsjs": "webcomponents/webcomponentsjs"
   }
 }
