@@ -1,5 +1,6 @@
 <link rel="import" href="../polymer/polymer.html">
 <script src="../nextprot/dist/nextprot.bundle.js"></script>
+<script src="../bootstrap/dist/js/bootstrap.js"></script>
 <script src="../feature-viewer/dist/feature-viewer.bundle.js"></script>
 <link rel="stylesheet" type="text/css" href="../feature-viewer/dist/feature-viewer.min.css">
 <script src="../sequence-viewer/dist/sequence-viewer.bundle.js"></script>
@@ -10,9 +11,18 @@ Complex element joining nextprot feature viewer, feature table and sequence view
 -->
 <dom-module id="triple-viewer">
   <template>
-    <style>
+    <style is="custom-style">
       :host {
         display: block;
+      }
+      #seqViewer ::content > .seqHeader {
+        width: 100%;
+      }
+      #seqViewer ::content > .seqHeader > div {
+        display: inline-block;
+        vertical-align: top;
+        text-align: center;
+        width: 25%;
       }
       .loading_icon {
         -webkit-animation:spin 2s linear infinite;
@@ -46,7 +56,10 @@ Complex element joining nextprot feature viewer, feature table and sequence view
               <th colspan="2" class="col-md-2 text-align-left">Evidence</th>
             </tr>
             </thead>
+            {{groupedFeatures}}
             <template is="dom-repeat" items="{{_toArray(groupedFeatures)}}" as="gf">
+              {{gf.key}}
+              {{gf.value}}
               <tbody>
               <th colspan="6" class="className {{gf.value.group}} general-info table-section-header"><div class="grey-x">{{gf.value.group}}</div></th>
               {{#each features}}
@@ -360,21 +373,42 @@ Complex element joining nextprot feature viewer, feature table and sequence view
         featuresForViewer: {
           type: Array,
           value: []
+        },
+        filterOptions: {
+          "type": Array,
+          value: {
+            "none": true
+          }
         }
       },
       attached: function() {
-        var nx = new Nextprot.Client("neXtprot triple viewer", "Calipho Group");
-        var nxEntry = nx.getEntryName();
-        this.isoName = nxEntry+"-1";
+        this.nx = new Nextprot.Client("neXtprot triple viewer", "Calipho Group");
+        this.nxEntry = this.nx.getEntryName();
+        this.isoName = this.nxEntry+"-1";
         var self=this;
-        nx.getProteinSequence(nxEntry).then(
+        this.nx.getIsoformMapping(this.nxEntry).then(
+                function(data){
+                  self.isoforms=data;
+                  //self.isoformMapping = self.testAlgoObject(data);
+                }
+        ).catch(function (err) {
+                  // catch any error that happened so far
+                  console.log("Argh, broken: " + err.message);
+                  console.log("Error at line : " + err.stack);
+                });
+        this.nx.getProteinSequence(this.nxEntry).then(
           function (data) {
             self.sequences = data;
-            console.log(data);
-            self.getMetadataByView();
-            self.getFeaturesByIsoform();
-            self.renderFeatureViewer();
-            self.fillTable();
+            Promise.all(self.getFeaturesByView())
+                    .then(function (oneData) {
+                      self.getMetadataByView();
+                      self.getFeaturesByIsoform(oneData);
+                      self._renderFeatureViewer();
+                      self.addFiltering();
+                      self.addFeatures();
+                      self.fillTable();
+                      self.toggleFiltering();
+                    });
           }
         );//.catch(function (err) {
             // catch any error that happened so far
@@ -382,14 +416,36 @@ Complex element joining nextprot feature viewer, feature table and sequence view
         //    console.log("Error at line : " + err.stack);
         //});
       },
-      getFeaturesByIsoform: function(){
-        for (var i=1; i<this.sequences.length-1;i++) {
-          var feat = NXUtils.convertMappingsToIsoformMap(this.sequences[i],this.metaData[i].name,this.metaData[i].filter, "");
+      getFeaturesByIsoform: function(isoforms){
+        this.isofroms=isoforms[0];
+        
+        for (var i=1; i<isoforms.length-1;i++) {
+          var feat = NXUtils.convertMappingsToIsoformMap(isoforms[i],this.metaData[i].name,this.metaData[i].filter, "");
+
           this.featuresByIsoform.push(feat);
           featForViewer = NXViewerUtils.convertNXAnnotations(feat,this.metaData[i]);
           this.featuresForViewer.push(featForViewer);
         }
-        console.log(this.featuresByIsoform);
+      },
+      getFeaturesByView: function() {
+        var featuresForViewer = [];
+        for (var feat in this.featureList) {
+          switch (this.featureList[feat].APIRef) {
+            case "sequence":
+              featuresForViewer.push(this.nx.getProteinSequence(this.nxEntry));
+              break;
+            case "antibody":
+              featuresForViewer.push(this.nx.getAntibody(this.nxEntry));
+              break;
+            case "isoform-mapping":
+              featuresForViewer.push(this.nx.getIsoformMapping(this.nxEntry));
+              break;
+            default:
+              featuresForViewer.push(this.nx.getAnnotationsByCategory(this.nxEntry, this.featureList[feat].APIRef));
+              break;
+          }
+        }
+        return featuresForViewer;
       },
       getMetadataByView: function() {
         this.metaData = [];
@@ -397,12 +453,28 @@ Complex element joining nextprot feature viewer, feature table and sequence view
           this.metaData.push(this.featureList[i].metadata);
         }
       },
-      renderFeatureViewer: function(){
+      addFiltering: function() {
+        $("#featureViewer").append("<div class=\"filter-block\" class=\"row\" style=\"margin:0px 20px;float:left;\"></div>");
+        this.activeFiltering = {
+          filters: {}
+        };
+        for (var i=0;i<this.featuresForViewer.length;i++) {
+          if (Object.keys(this.featuresForViewer[i]).length !== 0) {
+            var filter = this.featuresForViewer[i][Object.keys(this.featuresForViewer[i])[0]].filter;
+            if (filter !== "none" && (!this.activeFiltering.filters[filter.split(" ").join("_")])) {
+              var filterMin = filter.split(" ").join("_");
+              this.activeFiltering.filters[filterMin]=filter;
+              this.filterOptions[filterMin]=true;
+            }
+          }
+        }
+      },
+      _renderFeatureViewer: function(){
         var self=this;
         this.sequences.forEach(function (o) {
           if (o.uniqueName === self.isoName) {
-            currentSeq = o.sequence;
-            ft = new FeatureViewer(currentSeq, "#featureViewer", {
+            self.currentSeq = o.sequence;
+            self.ft = new FeatureViewer(self.currentSeq, "#featureViewer", {
               showAxis: true,
               showSequence: true,
               brushActive: true,
@@ -414,25 +486,60 @@ Complex element joining nextprot feature viewer, feature table and sequence view
               positionWithoutLetter:true,
               tooltipColor:"black"
             });
-            seqView = new Sequence(currentSeq, this.isoName);
-            seqView.render('#seqViewer', {
-              'showLineNumbers': true,
-              'wrapAminoAcids': true,
-              'charsPerLine': 50,
-              'search':true,
-              'toolbar':true,
-              'header':{
-                'display':false,
-                'searchInTitle': false,
-                'showCpl':false,
-                'badgeWithUnit':true
-              }
-            });
+            self._renderSequenceViewer(o);
           }
         });
       },
+      _renderSequenceViewer: function(sequenceObject){
+        seqView = new Sequence(this.currentSeq, this.isoName);
+        seqView.render('#seqViewer', {
+          'showLineNumbers': true,
+          'wrapAminoAcids': true,
+          'charsPerLine': 50,
+          'search':true,
+          'toolbar':true,
+          'header':{
+            'display':false,
+            'searchInTitle': false,
+            'showCpl':false,
+            'badgeWithUnit':true
+          }
+        });
+        //Customize Sequence viewer - raw version
+        this.$$(".fasta-link").setAttribute("href","https://old.nextprot.org/db/entry/" + this.isoName.split("-")[0] + "/fasta?isoform=" + this.isoName.slice(3));
+        var seqHeader = document.createElement("div");
+        seqHeader.setAttribute("class", "seqHeader");
+        this.$$("#seqViewer").insertBefore(seqHeader, this.$$(".sequenceBody"));
+        var isoformContainer = document.createElement("div");
+        var seqLenContainer = document.createElement("div");
+        var massContainer = document.createElement("div");
+        var isoElectricPointContainer = document.createElement("div");
+        isoformContainer.innerHTML = "<strong>Isoform :</strong> " + sequenceObject.mainEntityName.name;
+        seqLenContainer.innerHTML = sequenceObject.sequence.length + " aa";
+        massContainer.innerHTML = "<strong>Mass :</strong> " + sequenceObject.massAsString + " Da";
+        isoElectricPointContainer.innerHTML = "<strong>pI :</strong> " + sequenceObject.isoelectricPointAsString;
+        this.$$(".seqHeader").appendChild(isoformContainer);
+        this.$$(".seqHeader").appendChild(seqLenContainer);
+        this.$$(".seqHeader").appendChild(massContainer);
+        this.$$(".seqHeader").appendChild(isoElectricPointContainer);
+
+        this.$$("#seqViewer .inputSearchSeq").setAttribute("placeholder","Search in sequence...");
+        this.$$(".inputSearchSeq").setAttribute("data-toggle","tooltip");
+        this.$$("#seqViewer .inputSearchSeq").setAttribute("data-placement","top");
+        this.$$("#seqViewer .inputSearchSeq").setAttribute("title","Regex supported");
+
+        //this.$$('#seqViewer [data-toggle="tooltip"]').tooltip();
+      },
+      addFeatures: function() {
+        for (var i=0;i<this.featuresForViewer.length;i++) {
+          if (Object.keys(this.featuresForViewer[i]).length !== 0 && this.featuresForViewer[i].hasOwnProperty(this.isoName) && this.filterOptions[this.featuresForViewer[i][this.isoName].filter.split(" ").join("_")] === true) {
+            var feature = jQuery.extend({}, this.featuresForViewer[i][this.isoName]);
+            this.ft.addFeature(feature);
+          }
+        }
+      },
       fillTable: function() {
-        if ($("#featuresTable").length > 0) {
+        if (this.$$("#featuresTable").length > 0) {
           var number = 0;
           var features = {};
           this.featuresByIsoform.forEach( function (d) { if (d.hasOwnProperty(this.isoName)) {
@@ -445,11 +552,11 @@ Complex element joining nextprot feature viewer, feature table and sequence view
               }
             }
           }});
-
+          console.log(features);
           for (feat in this.featuresByIsoform) if(this.featuresByIsoform[feat].hasOwnProperty(this.isoName)) {
             number += this.featuresByIsoform[feat][this.isoName].length;
             for (var i=0;i<this.featuresByIsoform[feat][this.isoName].length;i++) if(this.featuresByIsoform[feat][this.isoName][i].source) {
-              this.featuresByIsoform[feat][this.isoName][i].evidenceSources = _getUniqueListOfEvidenceSources(this.featuresByIsoform[feat][this.isoName][i].source);
+              this.featuresByIsoform[feat][this.isoName][i].evidenceSources = this._getUniqueListOfEvidenceSources(this.featuresByIsoform[feat][this.isoName][i].source);
             }
           }
           this.groupedFeatures = features;
@@ -459,6 +566,60 @@ Complex element joining nextprot feature viewer, feature table and sequence view
         $(".evidenceNumber").click(function () {
           $(this).parent().parent().next().toggle();
         })
+      },
+      toggleFiltering: function() {
+        $("#filtering label").mouseover(function(){
+          var type=$(this).children("input").attr("id");
+          ft.showFilteredFeature(type, "#795B42", document.location.href);
+        });
+        $("#filtering label").mouseout(function(){
+          var type=$(this).children("input").attr("id");
+          ft.hideFilteredFeature(type);
+        });
+        $("#allFilters").click(function(){
+          if ($("#filtering").hasClass("all-filters")){
+
+            $("#filtering input[type=checkbox]").prop("checked", false);
+
+            console.log("has class all-filters");
+            for(var key in this.filterOptions) {
+              this.filterOptions[key] = false;
+            }
+            $("#filtering").removeClass("all-filters");
+          }
+          else {
+
+            $("#filtering input[type=checkbox]").prop("checked", true);
+
+            for(var key in this.filterOptions) {
+              this.filterOptions[key] = true;
+            }
+            $("#filtering").addClass("all-filters");
+          }
+          applyFiltering();
+          getInfoForIsoform.reloadSVG(isoName);
+
+        })
+        $("#filtering input:checkbox").on("change", function() {
+          console.log("count the number of checkbox not checked : ");
+          console.log($("#filtering input:checkbox:not(:checked)").length);
+
+          if (!$("#filtering input:checkbox:not(:checked)").length) {
+            console.log("all checkbox are checked");
+            $("#filtering").addClass("all-filters");
+          }
+          else if (!$("#filtering input:checkbox:checked").length) {
+            console.log("all checkbox are unchecked");
+            $("#filtering").removeClass("all-filters");
+          }
+          else {
+            $("#filtering").removeClass("all-filters");
+          }
+          this.filterOptions["none"] = true;
+          applyFiltering();
+          getInfoForIsoform.reloadSVG(isoName);
+        });
+
       },
       _getUniqueListOfEvidenceSources: function(evidenceList){
         var evidenceSourceList = [];
