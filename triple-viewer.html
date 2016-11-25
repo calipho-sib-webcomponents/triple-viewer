@@ -1,19 +1,50 @@
 <link rel="import" href="../polymer/polymer.html">
-<script src="../nextprot/dist/nextprot.bundle.js"></script>
-<script src="../bootstrap/dist/js/bootstrap.js"></script>
+<link rel="import" href="../iron-collapse/iron-collapse.html">
+<link rel="import" href="../evidence-item/evidence-item.html">
+<link rel="import" href="../quality-label/quality-label.html">
+<link rel="import" href="../shared-styles/shared-styles.html">
 <script src="../feature-viewer/dist/feature-viewer.bundle.js"></script>
-<link rel="stylesheet" type="text/css" href="../feature-viewer/dist/feature-viewer.min.css">
-<script src="../sequence-viewer/dist/sequence-viewer.bundle.js"></script>
+<script src="../sequence-viewer/dist/sequence-viewer.min.js"></script>
+<script src="../nextprot/src/nextprot-core.js"></script>
+<script src="../nextprot/src/nextprot-utils.js"></script>
 <!--
 `triple-viewer`
 Complex element joining nextprot feature viewer, feature table and sequence viewer
 @demo demo/index.html 
 -->
 <dom-module id="triple-viewer">
+  <link rel="stylesheet" type="text/css" href="../feature-viewer/dist/feature-viewer.min.css">
   <template>
-    <style is="custom-style">
+    <style is="custom-style" include="shared-styles">
       :host {
         display: block;
+      }
+      evidence-item {
+        padding: 8px 0 0 0;
+      }
+      #featuresTable {
+        font-size:11px;
+        background:#fff;
+        padding:5px 15px;
+        height:600px;
+        border: 1px solid #cfd9db;
+        border-radius:4px;
+      }
+      #featuresTable .variant-description{
+        color:#00C500;
+      }
+      table#featTable>tbody>tr>th {
+        padding: 0 8px;
+      }
+      table#featTable>tbody>tr:first-of-type + tr {
+        border-top: none;
+      }
+      table#featTable>tbody>tr {
+        border-top: 1px solid #ddd;
+        border-bottom: none;
+      }
+      table#featTable>tbody>tr>td {
+        border: none;
       }
       #seqViewer ::content > .seqHeader {
         width: 100%;
@@ -24,25 +55,86 @@ Complex element joining nextprot feature viewer, feature table and sequence view
         text-align: center;
         width: 25%;
       }
-      .loading_icon {
-        -webkit-animation:spin 2s linear infinite;
-        -moz-animation:spin 2s linear infinite;
-        animation:spin 2s linear infinite;
-        width:200px;
-        height:200px;
+      #seqViewer {
+        background:#fff;
+        padding:5px 15px;
+        height:600px;
+        border: 1px solid #cfd9db;
+        border-radius:4px;
       }
-      @-moz-keyframes spin { 100% {
-        -moz-transform:rotate(360deg);
-      } }
-      @-webkit-keyframes spin { 100% {
-        -webkit-transform:rotate(360deg);
-      } }
-      @keyframes spin { 100% {
-        -webkit-transform:rotate(360deg);
-        transform:rotate(360deg);
-      } }
+      .seqHeader{
+        margin-bottom:5px;
+        border-bottom:1px solid #E7EAEC;
+        height:45px;
+      }
+      .seqHeader>div{
+        display: inline-block;
+        margin:10px;
+      }
+      #seqViewer .seqInfos{
+        display: inline-block;
+        vertical-align: middle;
+        font-size:11px;
+        text-align: center;
+        float:right;
+        margin: 10px 5px 0px;
+      }
+      #seqViewer .seqInfos>.seqLabel{
+        font-weight: 900;
+        color:#777;
+      }
+      #seqViewer .seqInfos>.seqValue{
+        color:white;
+        padding:3px 5px;
+        text-align: center;
+        border-radius:3px;
+        float:right;
+      }
+      #seqViewer .seqIso>.seqValue{
+        background-color:#23c6c8;
+      }
+      #seqViewer .seqAALength>.seqValue{
+        background-color:#33C59E;
+        font-weight:700;
+      }
+      #seqViewer .seqMass>.seqValue{
+        background-color:#f8ac59;
+      }
+      #seqViewer .seqpI>.seqValue{
+        background-color:#92896F;
+      }
+      .evidenceNumber {
+        background: #7CBA0F;
+        padding: 4px 8px;
+        border-radius: 2px;
+        color: white;
+        vertical-align: top;
+        cursor: pointer;
+      }
+      .filter-block {
+        margin:0px 20px;
+        float:left;
+      }
     </style>
-    <div id="featureViewer"></div>
+    <div id="featureViewer">
+      <div class="filter-block row">
+        <div class="filter-heading">
+          <span class="fa fa-filter"></span>
+          <h5>FILTER</h5>
+        </div>
+        <div class="filter-body">
+          <div id="filtering" class="all-filters">
+            <button class="btn btn-default btn-sm" id="allFilters">All/None</button>
+            <template is="dom-repeat" items="{{_toArray(activeFiltering.filters)}}" as="filter">
+              {{filter}}
+              <label class="filter-box">
+                <input type="checkbox" id={{filter.name}} value="option1" checked>{{filter.value}}
+              </label>
+            </template>
+          </div>
+        </div>
+      </div>
+    </div>
     <div class="row" style="margin:0px 20px;">
       <div id="featuresTable" class="col-md-6" style="margin:10px 0px">
         <div id="featTableScroller" class="section-scroller">
@@ -56,46 +148,70 @@ Complex element joining nextprot feature viewer, feature table and sequence view
               <th colspan="2" class="col-md-2 text-align-left">Evidence</th>
             </tr>
             </thead>
-            {{groupedFeatures}}
-            <template is="dom-repeat" items="{{_toArray(groupedFeatures)}}" as="gf">
-              {{gf.key}}
-              {{gf.value}}
+            <template is="dom-repeat" items="{{_toArray(groupedFeatures)}}" as="featureGroup">
               <tbody>
-              <th colspan="6" class="className {{gf.value.group}} general-info table-section-header"><div class="grey-x">{{gf.value.group}}</div></th>
-              {{#each features}}
-              {{#each this}}
-              <tr id={{id}} class="{{{className category}}} general-info" >
-                <td>{{category}}</td>
-                <td class="text-align-right"><a class="featPosition" href="javascript:;">{{{position length}}}</a></td>
-                <td class="text-align-right">{{length}}</td>
-                <td>{{{link}}}{{#if variant}}{{#each source}}{{#if externalDb}}{{#if crossRef}}{{#crossRef}} ; {{dbName}} : {{{linkTo name url}}} {{/crossRef}}{{/if}}{{/if}}{{/each}}{{/if}}{{#unless proteotypicity}} <span class="nonProteotypic">found in other entries</span>{{/unless}}
-                  {{> quality-label qualityQualifier=quality}}
-                </td>
-                {{#if source}}
-                <td class="text-align-right"><span class="evidenceNumber">{{evidenceLength}}</span></td>
-                <td>
-                  <div class="reference-label-container">
-                    {{#each evidenceSources}}
-                    <div class="reference-label">{{this}}</div>
-                    {{/each}}
-                  </div>
-                </td>
-                {{else}}
-                <td></td>
-                <td></td>
-                {{/if}}
-              </tr>
-              <tr class="{{{className category}}} detailed-info">
-                <td colspan="6" class="table-row-evidence">
-                  {{#each source}}
-                  {{> evidence codeName=evidenceCodeName source=assignedBy accession=crossRef.name url=crossRef.url}}
-                  <div class="{{#if publicationMD5}}evidence-publication{{/if}}">
-                    {{> publication parentId=(concat id ../id)}}
-                  </div>
-                  {{/each}}
-                </td>
-              </tr>
-              {{/each}}{{/each}}
+              <tr><th colspan="6" class="{{_formatClassName(featureGroup.name, featureGroup.value.group)}} general-info table-section-header"><div class="grey-x">{{featureGroup.value.group}}</div></th></tr>
+              <template is="dom-repeat" items="{{featureGroup.value.features}}" as="features">
+                <template is="dom-repeat" items="{{features}}" as="feature">
+                  <tr id={{id}} class="{{{className category}}} general-info">
+                    <td>{{feature.category}}</td>
+                    <td class="text-align-right"><a class="featPosition" href="javascript:;">
+                    <template is="dom-if" if="{{_isDisulfideBondFeature(feature.category)}}">
+                      {{feature.start}}<span style="line-height: 0.8; vertical-align:top">&#x256d;&#x256e;</span>{{feature.end}}
+                    </template>
+                    <template is="dom-if" if="{{!_isDisulfideBondFeature(feature.category)}}">
+                      <template is="dom-if" if="{{_isSingleResidueFeature(feature.length)}}">
+                        {{feature.start}}
+                      </template>
+                      <template is="dom-if" if="{{!_isSingleResidueFeature(feature.length)}}">
+                        {{feature.start}}-{{feature.end}}
+                      </template>
+                    </template>
+                    </a></td>
+                    <td class="text-align-right">{{feature.length}}</td>
+                    <td><span inner-h-t-m-l="{{feature.link}}"></span>
+                      <template is="dom-if" if="{{feature.variant}}">
+                        <template is="dom-repeat" items="{{feature.source}}" as="{{source}}">
+                          <template is="dom-if" if="{{source.externalDb}}">
+                            <template is="dom-repeat" items="{{source.crossRef}}" as="crossRef">
+                              ; {{crossRef.dbName}} : <a class='ext-link' href="{{crossRef.url}}">{{crossRef.name}}</a>
+                            </template>
+                          </template>
+                        </template>
+                      </template>
+                      <template is="{{dom-if}}" if="{{!feature.proteotypicity}}">
+                        <span class="nonProteotypic">found in other entries</span>
+                      </template>
+                      <quality-label quality="{{feature.quality}}"></quality-label>
+                    </td>
+                    <template is="dom-if" if="{{feature.source}}">
+                      <td class="text-align-right">
+                          <span id="evidences-button-{{feature.id}}" class="evidenceNumber" on-click="_toggle">{{feature.evidenceLength}}</span>
+                      </td>
+                      <td>
+                        <div class="reference-label-container">
+                          <template is="dom-repeat" items="{{feature.evidenceSources}}" as="source">
+                            <div class="reference-label">{{source}}</div>
+                          </template>
+                        </div>
+                      </td>
+                    </template>
+                    <template is="dom-if" if="{{!feature.source}}">
+                      <td></td>
+                      <td></td>
+                    </template>
+                  </tr>
+                        <tr class="{{_formatClassName(feature.category, feature.group)}} detailed-info">
+                          <td colspan="6" class="table-row-evidence" style="padding: 0 8px;">
+                            <iron-collapse id="evidences-container-{{feature.id}}">
+                              <template is="dom-repeat" items="{{feature.source}}" as="evidence">
+                                <evidence-item index={{_increment(index)}} data="{{evidence}}"></evidence-item>
+                              </template>
+                            </iron-collapse>
+                          </td>
+                        </tr>
+                </template>
+              </template>
               </tbody>
             </template>
           </table>
@@ -120,268 +236,29 @@ Complex element joining nextprot feature viewer, feature table and sequence view
         featureList: {
           type: Array,
           value: [
-      {
-        "APIRef": "sequence",
-        "metadata": {"name": "Sequence"}
-      },
-      {
-        "APIRef": "interacting-region",
-        "metadata": {
-          "name": "Interacting region",
-          "className": "intregion",
-          "color": "#B3C2F0",
-          "type": "rect",
-          "filter": "Region"
-        }
-      },
-      {
-        "APIRef": "miscellaneous-region",
-        "metadata": {
-          "name": "Region",
-          "className": "miscregion",
-          "color": "#B3C2B3",
-          "type": "rect",
-          "filter": "Region"
-        }
-      },
-      {
-        "APIRef": "domain",
-        "metadata": {
-          "name": "Domain",
-          "className": "domain",
-          "color": "#B3C2C2",
-          "type": "rect",
-          "filter": "Region"
-        }
-      },
-      {
-        "APIRef": "repeat",
-        "metadata": {
-          "name": "Repeat",
-          "className": "repeat",
-          "color": "#98B7D5",
-          "type": "rect",
-          "filter": "Region"
-        }
-      },
-      {
-        "APIRef": "calcium-binding-region",
-        "metadata": {
-          "name": "Calcium binding",
-          "className": "calcium",
-          "color": "#B3C2E1",
-          "type": "rect",
-          "filter": "Region"
-        }
-      },
-      {
-        "APIRef": "zinc-finger-region",
-        "metadata": {
-          "name": "Zinc finger",
-          "className": "calcium",
-          "color": "#B3C2E1",
-          "type": "rect",
-          "filter": "Region"
-        }
-      },
-      {
-        "APIRef": "dna-binding-region",
-        "metadata": {
-          "name": "DNA binding",
-          "className": "dnabind",
-          "color": "#B3C2FF",
-          "type": "rect",
-          "filter": "Region"
-        }
-      },
-      {
-        "APIRef": "nucleotide-phosphate-binding-region",
-        "metadata": {
-          "name": "Nucleotide binding",
-          "className": "nucleobind",
-          "color": "#B3D1B3",
-          "type": "rect",
-          "filter": "Region"
-        }
-      },
-      {
-        "APIRef": "coiled-coil-region",
-        "metadata": {
-          "name": "Coiled-coil",
-          "className": "coiledcoil",
-          "color": "#B3D1C2",
-          "type": "rect",
-          "filter": "Region"
-        }
-      },
-      {
-        "APIRef": "short-sequence-motif",
-        "metadata": {
-          "name": "Sequence motif",
-          "className": "motif",
-          "color": "#B3D1D1",
-          "type": "rect",
-          "filter": "Region"
-        }
-      },
-      {
-        "APIRef": "compositionally-biased-region",
-        "metadata": {
-          "name": "Composition bias",
-          "className": "biased",
-          "color": "#B3D1E1",
-          "type": "rect",
-          "filter": "Region"
-        }
-      },
-      {
-        "APIRef": "topological-domain",
-        "metadata": {
-          "name": "Top domain",
-          "className": "topodomain",
-          "color": "#A5DBA5",
-          "type": "rect",
-          "filter": "Topology"
-        }
-      },
-      {
-        "APIRef": "transmembrane-region",
-        "metadata": {
-          "name": "Membrane",
-          "className": "membrane",
-          "color": "#A5DBB7",
-          "type": "rect",
-          "filter": "Topology"
-        }
-      },
-      {
-        "APIRef": "miscellaneous-site",
-        "metadata": {
-          "name": "Site",
-          "className": "site",
-          "color": "#B3F0E1",
-          "type": "unique",
-          "filter": "Site"
-        }
-      },
-      {
-        "APIRef": "active-site",
-        "metadata": {
-          "name": "Active site",
-          "className": "actSite",
-          "color": "#B3F0F0",
-          "type": "unique",
-          "filter": "Site"
-        }
-      },
-      {
-        "APIRef": "binding-site",
-        "metadata": {
-          "name": "Binding site",
-          "className": "bindsite",
-          "color": "#82E6FF",
-          "type": "unique",
-          "filter": "Site"
-        }
-      },
-      {
-        "APIRef": "cleavage-site",
-        "metadata": {
-          "name": "Cleavage site",
-          "className": "cleavsite",
-          "color": "#B3FFB3",
-          "type": "unique",
-          "filter": "Site"
-        }
-      },
-      {
-        "APIRef": "metal-binding-site",
-        "metadata": {
-          "name": "Metal binding",
-          "className": "metal",
-          "color": "#B3FFC2",
-          "type": "unique",
-          "filter": "Site"
-        }
-      },
-      {
-        "APIRef": "variant",
-        "metadata": {
-          "name": "Variant",
-          "className": "variant",
-          "color": "rgba(0,255,154,0.3)",
-          "type": "unique",
-          "filter": "Variant"
-        }
-      },
-      {
-        "APIRef": "mutagenesis",
-        "metadata": {
-          "name": "Mutagenesis",
-          "className": "mutagenesis",
-          "color": "#73FFE3",
-          "type": "unique",
-          "filter": "Variant"
-        }
-      },
-      {
-        "APIRef": "sequence-conflict",
-        "metadata": {
-          "name": "Conflict",
-          "className": "seqconflict",
-          "color": "#6FFFFF",
-          "type": "unique",
-          "filter": "Conflict"
-        }
-      },
-      {
-        "APIRef": "beta-strand",
-        "metadata": {
-          "name": "Beta strand",
-          "className": "betastrand",
-          "color": "#B3F0C2",
-          "type": "rect",
-          "filter": "Secondary structure"
-        }
-      },
-      {
-        "APIRef": "helix",
-        "metadata": {
-          "name": "Helix",
-          "className": "helix",
-          "color": "#B3F0D1",
-          "type": "rect",
-          "filter": "Secondary structure"
-        }
-      },
-      {
-        "APIRef": "turn",
-        "metadata": {
-          "name": "Turn",
-          "className": "turn",
-          "color": "#B3F0E1",
-          "type": "rect",
-          "filter": "Secondary structure"
-        }
-      },
-      {
-        "APIRef": "isoform-mapping",
-        "metadata": {}
-      }
-    ]
+          {
+            "APIRef": "sequence",
+            "metadata": {"name": "Sequence"}
+          }]
         },
         featuresForViewer: {
           type: Array,
           value: []
         },
         filterOptions: {
-          "type": Array,
+          type: Array,
           value: {
             "none": true
           }
+        },
+        activeFiltering: {
+          type: Array,
+          value: {
+            filters: {}
+          }
         }
       },
-      attached: function() {
+      created: function() {
         this.nx = new Nextprot.Client("neXtprot triple viewer", "Calipho Group");
         this.nxEntry = this.nx.getEntryName();
         this.isoName = this.nxEntry+"-1";
@@ -410,11 +287,11 @@ Complex element joining nextprot feature viewer, feature table and sequence view
                       self.toggleFiltering();
                     });
           }
-        );//.catch(function (err) {
+        ).catch(function (err) {
             // catch any error that happened so far
-        //    console.log("Argh, broken: " + err.message);
-        //    console.log("Error at line : " + err.stack);
-        //});
+            console.log("Argh, broken: " + err.message);
+            console.log("Error at line : " + err.stack);
+        });
       },
       getFeaturesByIsoform: function(isoforms){
         this.isofroms=isoforms[0];
@@ -454,11 +331,17 @@ Complex element joining nextprot feature viewer, feature table and sequence view
         }
       },
       addFiltering: function() {
-        $("#featureViewer").append("<div class=\"filter-block\" class=\"row\" style=\"margin:0px 20px;float:left;\"></div>");
-        this.activeFiltering = {
-          filters: {}
-        };
+        //console.log('adding filters');
+        //var filterBlock = document.createElement("div");
+        //filterBlock.setAttribute("class", "filter-block row");
+        // move this style
+        //filterBlock.setAttribute("style", "margin:0px 20px;float:left;");
+        //this.$$("#featureViewer").insertBefore(filterBlock, this.$$(".svgHeader"));
+        //this.activeFiltering = {
+        //  filters: {}
+        //};
         for (var i=0;i<this.featuresForViewer.length;i++) {
+          //console.log(this.featuresForViewer[i]);
           if (Object.keys(this.featuresForViewer[i]).length !== 0) {
             var filter = this.featuresForViewer[i][Object.keys(this.featuresForViewer[i])[0]].filter;
             if (filter !== "none" && (!this.activeFiltering.filters[filter.split(" ").join("_")])) {
@@ -539,20 +422,20 @@ Complex element joining nextprot feature viewer, feature table and sequence view
         }
       },
       fillTable: function() {
-        if (this.$$("#featuresTable").length > 0) {
+        if ($("#featuresTable").length > 0) {
           var number = 0;
           var features = {};
-          this.featuresByIsoform.forEach( function (d) { if (d.hasOwnProperty(this.isoName)) {
-            if(d[this.isoName]) {
-              var group = d[this.isoName][0].group;
+          var self=this;
+          this.featuresByIsoform.forEach( function (d) { if (d.hasOwnProperty(self.isoName)) {
+            if(d[self.isoName]) {
+              var group = d[self.isoName][0].group;
               if(Object.keys(features).indexOf(group)<0) {
-                features[group] = {'group': group, 'features': [d[this.isoName]]};
+                features[group] = {'group': group, 'features': [d[self.isoName]]};
               } else {
-                features[group]['features'].push(d[this.isoName]);
+                features[group]['features'].push(d[self.isoName]);
               }
             }
           }});
-          console.log(features);
           for (feat in this.featuresByIsoform) if(this.featuresByIsoform[feat].hasOwnProperty(this.isoName)) {
             number += this.featuresByIsoform[feat][this.isoName].length;
             for (var i=0;i<this.featuresByIsoform[feat][this.isoName].length;i++) if(this.featuresByIsoform[feat][this.isoName][i].source) {
@@ -560,7 +443,6 @@ Complex element joining nextprot feature viewer, feature table and sequence view
             }
           }
           this.groupedFeatures = features;
-          console.log(this.groupedFeatures);
           this.featuresLength = number;
         };
         $(".evidenceNumber").click(function () {
@@ -621,7 +503,7 @@ Complex element joining nextprot feature viewer, feature table and sequence view
         });
 
       },
-      _getUniqueListOfEvidenceSources: function(evidenceList){
+      _getUniqueListOfEvidenceSources: function(evidenceList) {
         var evidenceSourceList = [];
         evidenceList.forEach(function(evidence){
           if(evidenceSourceList.indexOf(evidence.assignedBy) < 0) {
@@ -640,6 +522,22 @@ Complex element joining nextprot feature viewer, feature table and sequence view
           });
         }
         return null;
+      },
+      _toggle: function(mouseEvent){
+        var srcElementId = mouseEvent.srcElement.id || mouseEvent.srcElement.parentNode.id;
+        this.$$("#"+srcElementId.replace('button','container')).toggle();
+      },
+      _isDisulfideBondFeature: function(featureCategory) {
+        return featureCategory === "Disulfide bond";
+      },
+      _isSingleResidueFeature: function(residueLength) {
+        return residueLength === 1;
+      },
+      _formatClassName: function(name, group) {
+        return name.replace(' ','')+" "+group.split(" ").join("_");
+      },
+      _increment: function(num) {
+        return num+1;
       }
     });
   </script>

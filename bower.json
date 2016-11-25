@@ -6,7 +6,11 @@
     "polymer": "Polymer/polymer#1.7",
     "feature-viewer": "^x.x.x",
     "nextprot-js": "nextprot#^0.0.x",
-    "sequence-viewer": "^x.x.x"
+    "sequence-viewer": "^x.x.x",
+    "evidence-item": "https://github.com/calipho-sib-webcomponents/evidence-item.git#develop",
+    "quality-label": "https://github.com/calipho-sib-webcomponents/quality-label.git#develop",
+    "shared-styles": "https://github.com/calipho-sib-webcomponents/shared-styles.git#develop",
+    "iron-collapse": "^1.3.0"
   },
   "devDependencies": {
     "iron-component-page": "PolymerElements/iron-component-page#^1.0.0",
