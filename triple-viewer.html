@@ -29,6 +29,7 @@ Complex element joining nextprot feature viewer, feature table and sequence view
         height:600px;
         border: 1px solid #cfd9db;
         border-radius:4px;
+        margin:10px 0px;
       }
       #featuresTable .variant-description{
         color:#00C500;
@@ -45,6 +46,9 @@ Complex element joining nextprot feature viewer, feature table and sequence view
       }
       table#featTable>tbody>tr>td {
         border: none;
+      }
+      table#featTable>tbody>tr .table-row-evidence {
+        padding: 0 8px;
       }
       #seqViewer ::content > .seqHeader {
         width: 100%;
@@ -115,7 +119,22 @@ Complex element joining nextprot feature viewer, feature table and sequence view
         margin:0px 20px;
         float:left;
       }
+      .tableHighlight {
+        background-color:rgba(197, 0, 99, 0.1) !important;
+      }
+      .tableHighlight td{
+        background-color:rgba(197, 0, 99, 0.1) !important;
+      }
+      .right-block {
+        margin:10px 0px;
+        padding-right:0px;
+      }
+      .sequenceRangeSpan {
+        line-height: 0.8;
+        vertical-align:top;
+      }
     </style>
+    <div class="row">
     <div id="featureViewer">
       <div class="filter-block row">
         <div class="filter-heading">
@@ -125,7 +144,7 @@ Complex element joining nextprot feature viewer, feature table and sequence view
         <div class="filter-body">
           <div id="filtering" class="all-filters">
             <button class="btn btn-default btn-sm" id="allFilters">All/None</button>
-            <template is="dom-repeat" items="{{_toArray(activeFiltering.filters)}}" as="filter">
+            <template is="dom-repeat" items="{{_toArray(activeFiltering)}}" as="filter">
               {{filter}}
               <label class="filter-box">
                 <input type="checkbox" id={{filter.name}} value="option1" checked>{{filter.value}}
@@ -135,8 +154,9 @@ Complex element joining nextprot feature viewer, feature table and sequence view
         </div>
       </div>
     </div>
-    <div class="row" style="margin:0px 20px;">
-      <div id="featuresTable" class="col-md-6" style="margin:10px 0px">
+    </div>
+    <div class="row">
+      <div id="featuresTable" class="col-md-6">
         <div id="featTableScroller" class="section-scroller">
           <table id="featTable" class="table table-striped table-fixed">
             <thead>
@@ -148,68 +168,70 @@ Complex element joining nextprot feature viewer, feature table and sequence view
               <th colspan="2" class="col-md-2 text-align-left">Evidence</th>
             </tr>
             </thead>
-            <template is="dom-repeat" items="{{_toArray(groupedFeatures)}}" as="featureGroup">
-              <tbody>
-              <tr><th colspan="6" class="{{_formatClassName(featureGroup.name, featureGroup.value.group)}} general-info table-section-header"><div class="grey-x">{{featureGroup.value.group}}</div></th></tr>
-              <template is="dom-repeat" items="{{featureGroup.value.features}}" as="features">
-                <template is="dom-repeat" items="{{features}}" as="feature">
-                  <tr id={{id}} class="{{{className category}}} general-info">
-                    <td>{{feature.category}}</td>
-                    <td class="text-align-right"><a class="featPosition" href="javascript:;">
-                    <template is="dom-if" if="{{_isDisulfideBondFeature(feature.category)}}">
-                      {{feature.start}}<span style="line-height: 0.8; vertical-align:top">&#x256d;&#x256e;</span>{{feature.end}}
-                    </template>
-                    <template is="dom-if" if="{{!_isDisulfideBondFeature(feature.category)}}">
-                      <template is="dom-if" if="{{_isSingleResidueFeature(feature.length)}}">
-                        {{feature.start}}
+            <template is="dom-repeat" items="[[_toArray(groupedFeatures)]]" as="featureGroup" initial-count="1">
+              <tbody><!--{{_formatClassName(featureGroup.name, featureGroup.value.group)}} -->
+              <tr><th colspan="6" class="general-info table-section-header"><div class="grey-x">[[featureGroup.value.group]]</div></th></tr>
+              <template is="dom-repeat" items="[[featureGroup.value.features]]" as="features" initial-count="1">
+                <template is="dom-repeat" items="[[features]]" as="feature" initial-count="10">
+                  <!--[[_formatClassName(feature.category, feature.group)]] -->
+                  <tr id=[[feature.id]] class="general-info">
+                    <td>[[feature.category]]</td>
+                    <td class="text-align-right"><a class="featPosition" on-tap="onFeatureSelected">
+                      <template is="dom-if" if="[[_isDisulfideBondFeature(feature.category)]]">
+                        [[feature.start]]<span class="sequenceRangeSpan">&#x256d;&#x256e;</span>[[feature.end]]
                       </template>
-                      <template is="dom-if" if="{{!_isSingleResidueFeature(feature.length)}}">
-                        {{feature.start}}-{{feature.end}}
+                      <template is="dom-if" if="[[!_isDisulfideBondFeature(feature.category)]]">
+                        <template is="dom-if" if="[[_isSingleResidueFeature(feature.length)]]">
+                          [[feature.start]]
+                        </template>
+                        <template is="dom-if" if="[[!_isSingleResidueFeature(feature.length)]]">
+                          [[feature.start]]-[[feature.end]]
+                        </template>
                       </template>
-                    </template>
                     </a></td>
-                    <td class="text-align-right">{{feature.length}}</td>
-                    <td><span inner-h-t-m-l="{{feature.link}}"></span>
-                      <template is="dom-if" if="{{feature.variant}}">
-                        <template is="dom-repeat" items="{{feature.source}}" as="{{source}}">
-                          <template is="dom-if" if="{{source.externalDb}}">
-                            <template is="dom-repeat" items="{{source.crossRef}}" as="crossRef">
-                              ; {{crossRef.dbName}} : <a class='ext-link' href="{{crossRef.url}}">{{crossRef.name}}</a>
+                    <td class="text-align-right">[[feature.length]]</td>
+                    <td><span inner-h-t-m-l="[[feature.link]]"></span>
+                      <template is="dom-if" if="[[feature.variant]]">
+                        <template is="dom-repeat" items="[[_toArray(feature.source)]]" as="source" initial-count="10">
+                          <template is="dom-if" if="[[source.externalDb]]">
+                            <template is="dom-repeat" items="[[source.value.crossRef]]" as="crossRef" initial-count="10">
+                              ; [[crossRef.dbName]] : <a class='ext-link' href="[[crossRef.url]]">{{crossRef.name}}</a>
                             </template>
                           </template>
                         </template>
                       </template>
-                      <template is="{{dom-if}}" if="{{!feature.proteotypicity}}">
+                      <template is="dom-if" if="[[!feature.proteotypicity]]">
                         <span class="nonProteotypic">found in other entries</span>
                       </template>
-                      <quality-label quality="{{feature.quality}}"></quality-label>
+                      <quality-label quality="[[feature.quality]]"></quality-label>
                     </td>
-                    <template is="dom-if" if="{{feature.source}}">
+                    <template is="dom-if" if="[[feature.source]]">
                       <td class="text-align-right">
-                          <span id="evidences-button-{{feature.id}}" class="evidenceNumber" on-click="_toggle">{{feature.evidenceLength}}</span>
+                        <span id="evidences-button-[[feature.id]]" class="evidenceNumber" on-click="_toggle">[[feature.evidenceLength]]</span>
                       </td>
                       <td>
                         <div class="reference-label-container">
-                          <template is="dom-repeat" items="{{feature.evidenceSources}}" as="source">
-                            <div class="reference-label">{{source}}</div>
+                          <template is="dom-repeat" items="[[feature.evidenceSources]]" as="source">
+                            <div class="reference-label">[[source]]</div>
                           </template>
                         </div>
                       </td>
                     </template>
-                    <template is="dom-if" if="{{!feature.source}}">
+                    <template is="dom-if" if="[[!feature.source]]">
                       <td></td>
                       <td></td>
                     </template>
                   </tr>
-                        <tr class="{{_formatClassName(feature.category, feature.group)}} detailed-info">
-                          <td colspan="6" class="table-row-evidence" style="padding: 0 8px;">
-                            <iron-collapse id="evidences-container-{{feature.id}}">
-                              <template is="dom-repeat" items="{{feature.source}}" as="evidence">
-                                <evidence-item index={{_increment(index)}} data="{{evidence}}"></evidence-item>
-                              </template>
-                            </iron-collapse>
-                          </td>
-                        </tr>
+                  <!--[[_formatClassName(feature.category, feature.group)]] -->
+                  <tr class="detailed-info">
+                    <td colspan="6" class="table-row-evidence">
+                      <iron-collapse id="evidences-container-[[feature.id]]">
+                        <template is="dom-repeat" items="[[feature.source]]" as="evidence">
+                          <evidence-item index="[[_increment(index)]]" data="[[evidence]]"></evidence-item>
+                        </template>
+                      </iron-collapse>
+                    </td>
+                  </tr>
                 </template>
               </template>
               </tbody>
@@ -217,7 +239,7 @@ Complex element joining nextprot feature viewer, feature table and sequence view
           </table>
         </div>
       </div>
-      <div class="col-md-6 right-block" style="margin:10px 0px;padding-right:0px;">
+      <div class="col-md-6 right-block">
         <div id="seqViewer"></div>
       </div>
     </div>
@@ -253,39 +275,27 @@ Complex element joining nextprot feature viewer, feature table and sequence view
         },
         activeFiltering: {
           type: Array,
-          value: {
-            filters: {}
-          }
+          value: {}
         }
       },
-      created: function() {
+      ready: function() {
         this.nx = new Nextprot.Client("neXtprot triple viewer", "Calipho Group");
         this.nxEntry = this.nx.getEntryName();
         this.isoName = this.nxEntry+"-1";
         var self=this;
-        this.nx.getIsoformMapping(this.nxEntry).then(
-                function(data){
-                  self.isoforms=data;
-                  //self.isoformMapping = self.testAlgoObject(data);
-                }
-        ).catch(function (err) {
-                  // catch any error that happened so far
-                  console.log("Argh, broken: " + err.message);
-                  console.log("Error at line : " + err.stack);
-                });
         this.nx.getProteinSequence(this.nxEntry).then(
           function (data) {
             self.sequences = data;
+            self.getMetadataByView();
             Promise.all(self.getFeaturesByView())
-                    .then(function (oneData) {
-                      self.getMetadataByView();
-                      self.getFeaturesByIsoform(oneData);
-                      self._renderFeatureViewer();
-                      self.addFiltering();
-                      self.addFeatures();
-                      self.fillTable();
-                      self.toggleFiltering();
-                    });
+              .then(function (oneData) {
+                self.getFeaturesByIsoform(oneData);
+                self._renderFeatureViewer();
+                self.addFiltering();
+                self.addFeatures();
+                self.toggleFiltering();
+                self.fillTable();
+              });
           }
         ).catch(function (err) {
             // catch any error that happened so far
@@ -293,9 +303,19 @@ Complex element joining nextprot feature viewer, feature table and sequence view
             console.log("Error at line : " + err.stack);
         });
       },
+      reloadSVG: function(){
+          $("#chart svg").remove();
+          this.ft.clearInstance();
+          this._renderFeatureViewer();
+          this.addFeatures();
+          if ($(".zoomUnit").length) $(".zoomUnit").text("1");
+          d3.selectAll('div.selectedRect').remove();
+
+          this.tvSelection();
+          this.eventTV();
+      },
       getFeaturesByIsoform: function(isoforms){
         this.isofroms=isoforms[0];
-        
         for (var i=1; i<isoforms.length-1;i++) {
           var feat = NXUtils.convertMappingsToIsoformMap(isoforms[i],this.metaData[i].name,this.metaData[i].filter, "");
 
@@ -331,22 +351,12 @@ Complex element joining nextprot feature viewer, feature table and sequence view
         }
       },
       addFiltering: function() {
-        //console.log('adding filters');
-        //var filterBlock = document.createElement("div");
-        //filterBlock.setAttribute("class", "filter-block row");
-        // move this style
-        //filterBlock.setAttribute("style", "margin:0px 20px;float:left;");
-        //this.$$("#featureViewer").insertBefore(filterBlock, this.$$(".svgHeader"));
-        //this.activeFiltering = {
-        //  filters: {}
-        //};
         for (var i=0;i<this.featuresForViewer.length;i++) {
-          //console.log(this.featuresForViewer[i]);
           if (Object.keys(this.featuresForViewer[i]).length !== 0) {
             var filter = this.featuresForViewer[i][Object.keys(this.featuresForViewer[i])[0]].filter;
-            if (filter !== "none" && (!this.activeFiltering.filters[filter.split(" ").join("_")])) {
+            if (filter !== "none" && (!this.activeFiltering[filter.split(" ").join("_")])) {
               var filterMin = filter.split(" ").join("_");
-              this.activeFiltering.filters[filterMin]=filter;
+              this.activeFiltering[filterMin]=filter;
               this.filterOptions[filterMin]=true;
             }
           }
@@ -374,8 +384,8 @@ Complex element joining nextprot feature viewer, feature table and sequence view
         });
       },
       _renderSequenceViewer: function(sequenceObject){
-        seqView = new Sequence(this.currentSeq, this.isoName);
-        seqView.render('#seqViewer', {
+        this.seqView = new Sequence(this.currentSeq, this.isoName);
+        this.seqView.render('#seqViewer', {
           'showLineNumbers': true,
           'wrapAminoAcids': true,
           'charsPerLine': 50,
@@ -411,7 +421,7 @@ Complex element joining nextprot feature viewer, feature table and sequence view
         this.$$("#seqViewer .inputSearchSeq").setAttribute("data-placement","top");
         this.$$("#seqViewer .inputSearchSeq").setAttribute("title","Regex supported");
 
-        //this.$$('#seqViewer [data-toggle="tooltip"]').tooltip();
+        $('#seqViewer [data-toggle="tooltip"]').tooltip();
       },
       addFeatures: function() {
         for (var i=0;i<this.featuresForViewer.length;i++) {
@@ -426,30 +436,25 @@ Complex element joining nextprot feature viewer, feature table and sequence view
           var number = 0;
           var features = {};
           var self=this;
-          this.featuresByIsoform.forEach( function (d) { if (d.hasOwnProperty(self.isoName)) {
-            if(d[self.isoName]) {
-              var group = d[self.isoName][0].group;
-              if(Object.keys(features).indexOf(group)<0) {
-                features[group] = {'group': group, 'features': [d[self.isoName]]};
-              } else {
-                features[group]['features'].push(d[self.isoName]);
-              }
-            }
-          }});
+
           for (feat in this.featuresByIsoform) if(this.featuresByIsoform[feat].hasOwnProperty(this.isoName)) {
+            var group = this.featuresByIsoform[feat][self.isoName][0].group;
+            if(Object.keys(features).indexOf(group)<0) {
+              features[group] = {'group': group, 'features': [this.featuresByIsoform[feat][self.isoName]]};
+            } else {
+              features[group]['features'].push(this.featuresByIsoform[feat][self.isoName]);
+            }
             number += this.featuresByIsoform[feat][this.isoName].length;
             for (var i=0;i<this.featuresByIsoform[feat][this.isoName].length;i++) if(this.featuresByIsoform[feat][this.isoName][i].source) {
               this.featuresByIsoform[feat][this.isoName][i].evidenceSources = this._getUniqueListOfEvidenceSources(this.featuresByIsoform[feat][this.isoName][i].source);
             }
           }
-          this.groupedFeatures = features;
+          this.notifyPath("groupedFeatures", features);
           this.featuresLength = number;
         };
-        $(".evidenceNumber").click(function () {
-          $(this).parent().parent().next().toggle();
-        })
       },
       toggleFiltering: function() {
+        var self = this;
         $("#filtering label").mouseover(function(){
           var type=$(this).children("input").attr("id");
           ft.showFilteredFeature(type, "#795B42", document.location.href);
@@ -478,10 +483,11 @@ Complex element joining nextprot feature viewer, feature table and sequence view
             }
             $("#filtering").addClass("all-filters");
           }
-          applyFiltering();
-          getInfoForIsoform.reloadSVG(isoName);
+          self.applyFiltering();
+          self.reloadSVG();
 
-        })
+        });
+        var self=this;
         $("#filtering input:checkbox").on("change", function() {
           console.log("count the number of checkbox not checked : ");
           console.log($("#filtering input:checkbox:not(:checked)").length);
@@ -497,11 +503,83 @@ Complex element joining nextprot feature viewer, feature table and sequence view
           else {
             $("#filtering").removeClass("all-filters");
           }
-          this.filterOptions["none"] = true;
-          applyFiltering();
-          getInfoForIsoform.reloadSVG(isoName);
+          self.filterOptions["none"] = true;
+          self.applyFiltering();
+          self.reloadSVG();
         });
 
+      },
+      applyFiltering: function() {
+        for (var filter in this.activeFiltering) {
+          if ($("#"+filter).prop("checked")) {
+            $("."+filter+".general-info").show();
+            filterOptions[filter] = true;
+          } else {
+            $("."+filter).hide();
+            this.filterOptions[filter] = false;
+          }
+        }
+        var tableLength = $("#featuresTable .general-info:visible").length;
+        $("#featuresTableTitle .badge").text(tableLength);
+      },
+      tvSelection: function() {
+        $(".featPosition").click(function() {
+          $(".tableHighlight").removeClass("tableHighlight");
+          $(this).parent().parent().addClass("tableHighlight");
+          var currentId = $(this).parent().parent().attr("id");
+          var position = currentId.split("_").slice(1).map(Number);
+          if (position.length === 1) position.push(position[0]);
+          var svgId = "#" + "f" + currentId;
+
+          position[0]-=1;
+          this.seqView.selection(position[0],position[1],"#C50063");
+          this.ft.addRectSelection(svgId);
+
+          this.scrollAuto(".stringSelected", ".scroller",200);
+        })
+      },
+      eventTV: function() {
+        this.ft.onFeatureSelected(function(d){
+          console.log('now');
+          // update isoform selector
+          this.fvSelection(d.detail);
+        });
+      },
+      onFeatureSelected: function(callback) {
+        var self = this;
+        this.ft.onFeatureSelected(function(d){
+          //callback(d.detail);
+          self.fvSelection(d.detail);
+        });
+        $(".featPosition").click(function() {
+          console.log($(this).parent().parent().attr("id"));
+          var currentId = $(this).parent().parent().attr("id");
+          var idParsed = currentId.split("_").slice(1).map(Number);
+          var position = {
+            start: idParsed[0],
+            end: idParsed[1]
+          }
+          callback(position);
+        });
+      },
+      fvSelection: function(d) {
+        console.log(d);
+        this.seqView.selection(d.start - 1,d.end,"#C50063");
+        var featSelectedID = "#" + d.id;
+        $(".tableHighlight").removeClass("tableHighlight");
+        $(featSelectedID).addClass("tableHighlight");
+
+        this.scrollAuto(featSelectedID, "#featTableScroller",70);
+        this.scrollAuto(".stringSelected", ".scroller",200);
+      },
+      scrollAuto: function(elem, container, shiftTop) {
+        console.log(elem);
+        var ElementTop = $(elem).position().top-shiftTop;
+        var scrollPosition = $(container).scrollTop();
+        var scrollingLength = ElementTop + scrollPosition;
+        console.log(scrollingLength);
+        console.log(scrollPosition);
+        $(container).animate({scrollTop: scrollingLength}, 1000);
       },
       _getUniqueListOfEvidenceSources: function(evidenceList) {
         var evidenceSourceList = [];
@@ -537,7 +615,7 @@ Complex element joining nextprot feature viewer, feature table and sequence view
         return name.replace(' ','')+" "+group.split(" ").join("_");
       },
       _increment: function(num) {
-        return num+1;
+        return num+=1;
       }
     });
   </script>
