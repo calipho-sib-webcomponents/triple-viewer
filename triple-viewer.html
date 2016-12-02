@@ -176,29 +176,11 @@ Complex element joining nextprot feature viewer, feature table and sequence view
                   <tr id=[[feature.id]] class="general-info">
                     <td>[[feature.category]]</td>
                     <td class="text-align-right"><a class="featPosition" on-tap="onFeatureSelected">
-                      <template is="dom-if" if="[[_isDisulfideBondFeature(feature.category)]]">
-                        [[feature.start]]<span class="sequenceRangeSpan">&#x256d;&#x256e;</span>[[feature.end]]
-                      </template>
-                      <template is="dom-if" if="[[!_isDisulfideBondFeature(feature.category)]]">
-                        <template is="dom-if" if="[[_isSingleResidueFeature(feature.length)]]">
-                          [[feature.start]]
-                        </template>
-                        <template is="dom-if" if="[[!_isSingleResidueFeature(feature.length)]]">
-                          [[feature.start]]-[[feature.end]]
-                        </template>
-                      </template>
+                      <span inner-h-t-m-l="[[feature.range]]"></span>
                     </a></td>
                     <td class="text-align-right">[[feature.length]]</td>
                     <td><span inner-h-t-m-l="[[feature.link]]"></span>
-                      <template is="dom-if" if="[[feature.variant]]">
-                        <template is="dom-repeat" items="[[_toArray(feature.source)]]" as="source">
-                          <template is="dom-if" if="[[source.externalDb]]">
-                            <template is="dom-repeat" items="[[source.value.crossRef]]" as="crossRef">
-                              ; [[crossRef.dbName]] : <a class='ext-link' href="[[crossRef.url]]">{{crossRef.name}}</a>
-                            </template>
-                          </template>
-                        </template>
-                      </template>
+                      <span inner-h-t-m-l="[[feature.crossRef]]"></span>
                       <template is="dom-if" if="[[!feature.proteotypicity]]">
                         <span class="nonProteotypic">found in other entries</span>
                       </template>
@@ -222,7 +204,7 @@ Complex element joining nextprot feature viewer, feature table and sequence view
                     </template>
                   </tr>
                   <!--[[_formatClassName(feature.category, feature.group)]] -->
-                  <!--<tr class="detailed-info">
+                  <tr class="detailed-info">
                     <td colspan="6" class="table-row-evidence">
                       <iron-collapse id="evidences-container-[[feature.id]]">
                         <template is="dom-repeat" items="[[feature.source]]" as="evidence">
@@ -230,7 +212,7 @@ Complex element joining nextprot feature viewer, feature table and sequence view
                         </template>
                       </iron-collapse>
                     </td>
-                  </tr>-->
+                  </tr>
               </template>
               </tbody>
             </template>
@@ -316,10 +298,9 @@ Complex element joining nextprot feature viewer, feature table and sequence view
         this.isofroms=isoforms[0];
         for (var i=1; i<isoforms.length-1;i++) {
           var feat = NXUtils.convertMappingsToIsoformMap(isoforms[i],this.metaData[i].name,this.metaData[i].filter, "");
-          //feat.range = feature.start+"-"+feature.end;
-          this.featuresByIsoform.push(feat);
           featForViewer = NXViewerUtils.convertNXAnnotations(feat,this.metaData[i]);
           this.featuresForViewer.push(featForViewer);
+          this.featuresByIsoform.push(feat);
         }
       },
       getFeaturesByView: function() {
@@ -434,21 +415,40 @@ Complex element joining nextprot feature viewer, feature table and sequence view
           var number = 0;
           var features = {};
           var self=this;
-
           for (feat in this.featuresByIsoform) if(this.featuresByIsoform[feat].hasOwnProperty(this.isoName)) {
             var group = this.featuresByIsoform[feat][self.isoName][0].group;
-            if(Object.keys(features).indexOf(group)<0) {
-              features[group] = this.featuresByIsoform[feat][self.isoName];
-            } else {
-              features[group].push(this.featuresByIsoform[feat][self.isoName]);
+            var featureList = this.featuresByIsoform[feat][self.isoName];
+            for (var i in featureList){
+              var feature = featureList[i];
+              if(feature.variant){
+                for (var j in feature.source){
+                  if(feature.source[j].externalDb) {
+                    if(feature.source[j].crossRef){
+                      var crossRef = feature.source[j].crossRef;
+                      feature.crossRef = '; '+crossRef.dbName+' : <a class="ext-link" href="'+crossRef.url+'">'+crossRef.name+'</a>';
+                    }
+                  }
+                }
+              }
+              if(this._isDisulfideBondFeature(feature.category)){
+                featureList[i].range = feature.start+"&#x256d;&#x256e;"+feature.end;
+              }else if(this._isSingleResidueFeature(feature.length)){
+                featureList[i].range = feature.start;
+              }else{
+                featureList[i].range = feature.start+"-"+feature.end;
+              }
             }
-            number += this.featuresByIsoform[feat][this.isoName].length;
+            if(Object.keys(features).indexOf(group)<0) {
+              features[group] = featureList;
+            } else {
+              features[group].push(featureList);
+            }
+            number += feature.length;
             for (var i=0;i<this.featuresByIsoform[feat][this.isoName].length;i++) if(this.featuresByIsoform[feat][this.isoName][i].source) {
               this.featuresByIsoform[feat][this.isoName][i].evidenceSources = this._getUniqueListOfEvidenceSources(this.featuresByIsoform[feat][this.isoName][i].source);
             }
           }
           this.notifyPath("groupedFeatures", features);
-          console.log(features);
           this.featuresLength = number;
         };
       },
