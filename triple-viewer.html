@@ -168,11 +168,10 @@ Complex element joining nextprot feature viewer, feature table and sequence view
               <th colspan="2" class="col-md-2 text-align-left">Evidence</th>
             </tr>
             </thead>
-            <template is="dom-repeat" items="[[_toArray(groupedFeatures)]]" as="featureGroup" initial-count="1">
+            <template is="dom-repeat" items="[[_toArray(groupedFeatures)]]" as="featureGroup">
               <tbody><!--{{_formatClassName(featureGroup.name, featureGroup.value.group)}} -->
-              <tr><th colspan="6" class="general-info table-section-header"><div class="grey-x">[[featureGroup.value.group]]</div></th></tr>
-              <template is="dom-repeat" items="[[featureGroup.value.features]]" as="features" initial-count="1">
-                <template is="dom-repeat" items="[[features]]" as="feature" initial-count="10">
+              <tr><th colspan="6" class="general-info table-section-header"><div class="grey-x">[[featureGroup.name]]</div></th></tr>
+              <template is="dom-repeat" items="[[featureGroup.value]]" as="feature" initial-count="100" target-framerate="1">
                   <!--[[_formatClassName(feature.category, feature.group)]] -->
                   <tr id=[[feature.id]] class="general-info">
                     <td>[[feature.category]]</td>
@@ -192,9 +191,9 @@ Complex element joining nextprot feature viewer, feature table and sequence view
                     <td class="text-align-right">[[feature.length]]</td>
                     <td><span inner-h-t-m-l="[[feature.link]]"></span>
                       <template is="dom-if" if="[[feature.variant]]">
-                        <template is="dom-repeat" items="[[_toArray(feature.source)]]" as="source" initial-count="10">
+                        <template is="dom-repeat" items="[[_toArray(feature.source)]]" as="source">
                           <template is="dom-if" if="[[source.externalDb]]">
-                            <template is="dom-repeat" items="[[source.value.crossRef]]" as="crossRef" initial-count="10">
+                            <template is="dom-repeat" items="[[source.value.crossRef]]" as="crossRef">
                               ; [[crossRef.dbName]] : <a class='ext-link' href="[[crossRef.url]]">{{crossRef.name}}</a>
                             </template>
                           </template>
@@ -223,7 +222,7 @@ Complex element joining nextprot feature viewer, feature table and sequence view
                     </template>
                   </tr>
                   <!--[[_formatClassName(feature.category, feature.group)]] -->
-                  <tr class="detailed-info">
+                  <!--<tr class="detailed-info">
                     <td colspan="6" class="table-row-evidence">
                       <iron-collapse id="evidences-container-[[feature.id]]">
                         <template is="dom-repeat" items="[[feature.source]]" as="evidence">
@@ -231,8 +230,7 @@ Complex element joining nextprot feature viewer, feature table and sequence view
                         </template>
                       </iron-collapse>
                     </td>
-                  </tr>
-                </template>
+                  </tr>-->
               </template>
               </tbody>
             </template>
@@ -318,7 +316,7 @@ Complex element joining nextprot feature viewer, feature table and sequence view
         this.isofroms=isoforms[0];
         for (var i=1; i<isoforms.length-1;i++) {
           var feat = NXUtils.convertMappingsToIsoformMap(isoforms[i],this.metaData[i].name,this.metaData[i].filter, "");
-
+          //feat.range = feature.start+"-"+feature.end;
           this.featuresByIsoform.push(feat);
           featForViewer = NXViewerUtils.convertNXAnnotations(feat,this.metaData[i]);
           this.featuresForViewer.push(featForViewer);
@@ -440,9 +438,9 @@ Complex element joining nextprot feature viewer, feature table and sequence view
           for (feat in this.featuresByIsoform) if(this.featuresByIsoform[feat].hasOwnProperty(this.isoName)) {
             var group = this.featuresByIsoform[feat][self.isoName][0].group;
             if(Object.keys(features).indexOf(group)<0) {
-              features[group] = {'group': group, 'features': [this.featuresByIsoform[feat][self.isoName]]};
+              features[group] = this.featuresByIsoform[feat][self.isoName];
             } else {
-              features[group]['features'].push(this.featuresByIsoform[feat][self.isoName]);
+              features[group].push(this.featuresByIsoform[feat][self.isoName]);
             }
             number += this.featuresByIsoform[feat][this.isoName].length;
             for (var i=0;i<this.featuresByIsoform[feat][this.isoName].length;i++) if(this.featuresByIsoform[feat][this.isoName][i].source) {
@@ -450,6 +448,7 @@ Complex element joining nextprot feature viewer, feature table and sequence view
             }
           }
           this.notifyPath("groupedFeatures", features);
+          console.log(features);
           this.featuresLength = number;
         };
       },
