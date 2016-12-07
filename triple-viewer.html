@@ -1,5 +1,4 @@
 <link rel="import" href="../polymer/polymer.html">
-<link rel="import" href="../iron-collapse/iron-collapse.html">
 <link rel="import" href="../evidence-item/evidence-item.html">
 <link rel="import" href="../quality-label/quality-label.html">
 <link rel="import" href="../shared-styles/shared-styles.html">
@@ -21,6 +20,9 @@ Complex element joining nextprot feature viewer, feature table and sequence view
       }
       evidence-item {
         padding: 8px 0 0 0;
+      }
+      td[hidden] {
+        display: none;
       }
       #featuresTable {
         font-size:11px;
@@ -171,7 +173,7 @@ Complex element joining nextprot feature viewer, feature table and sequence view
             <template is="dom-repeat" items="[[_toArray(groupedFeatures)]]" as="featureGroup">
               <tbody><!--{{_formatClassName(featureGroup.name, featureGroup.value.group)}} -->
               <tr><th colspan="6" class="general-info table-section-header"><div class="grey-x">[[featureGroup.name]]</div></th></tr>
-              <template is="dom-repeat" items="[[featureGroup.value]]" as="feature" initial-count="100" target-framerate="1">
+              <template is="dom-repeat" items="[[featureGroup.value]]" as="feature">
                   <!--[[_formatClassName(feature.category, feature.group)]] -->
                   <tr id=[[feature.id]] class="general-info">
                     <td>[[feature.category]]</td>
@@ -188,7 +190,7 @@ Complex element joining nextprot feature viewer, feature table and sequence view
                     </td>
                     <template is="dom-if" if="[[feature.source]]">
                       <td class="text-align-right">
-                        <span id="evidences-button-[[feature.id]]" class="evidenceNumber" on-click="_toggle">[[feature.evidenceLength]]</span>
+                        <span id="evidences-button-[[feature.id]]" class="evidenceNumber" data-args$="[[feature]]" on-tap="_showEvidences">[[feature.evidenceLength]]</span>
                       </td>
                       <td>
                         <div class="reference-label-container">
@@ -205,13 +207,7 @@ Complex element joining nextprot feature viewer, feature table and sequence view
                   </tr>
                   <!--[[_formatClassName(feature.category, feature.group)]] -->
                   <tr class="detailed-info">
-                    <td colspan="6" class="table-row-evidence">
-                      <iron-collapse id="evidences-container-[[feature.id]]">
-                        <template is="dom-repeat" items="[[feature.source]]" as="evidence">
-                          <evidence-item index="[[_increment(index)]]" data="[[evidence]]"></evidence-item>
-                        </template>
-                      </iron-collapse>
-                    </td>
+                    <td colspan="6" id="[[feature.id]]-evidence-container" class="table-row-evidence"></td>
                   </tr>
               </template>
               </tbody>
@@ -615,7 +611,25 @@ Complex element joining nextprot feature viewer, feature table and sequence view
       },
       _increment: function(num) {
         return num+=1;
-      }
+      },
+      _showEvidences: function(e){
+        var feature = JSON.parse(e.target.dataset.args);
+        var container = this.$$("#"+feature.id+"-evidence-container");
+        if(container.childElementCount===0){
+          for (i in feature.source){
+            var evidence = feature.source[i];
+            var evidenceItem = document.createElement("evidence-item");
+            evidenceItem.setAttribute("index", new Number(i+1));
+            evidenceItem.data=evidence;
+            container.appendChild(evidenceItem);
+            this.updateStyles();
+          }
+        } else if (container.hidden) {
+          container.hidden = false;
+        } else {
+          container.hidden = true;
+        }
+    }
     });
   </script>
 </dom-module>
